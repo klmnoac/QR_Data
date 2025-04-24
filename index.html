@@ -2,153 +2,147 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>QR Scanner</title>
+  <title>QR-Based Student Entry</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
     body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: #f4f4f9;
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
       color: #333;
-      padding: 1rem;
+    }
+    h2 {
+      text-align: center;
+      color: #444;
     }
     .container {
       max-width: 400px;
       margin: auto;
     }
-    h1 {
-      text-align: center;
-      color: #444;
-    }
     #reader {
       width: 100%;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      margin-bottom: 1rem;
     }
-    select {
-      width: 100%;
-      padding: 10px;
-      margin: 1rem 0;
-      font-size: 1rem;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-    .result, .history {
+    form {
       background: #fff;
       padding: 1rem;
       border-radius: 12px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-      margin-top: 1rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    .result span {
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background: #2a9d8f;
+      color: white;
       font-weight: bold;
-      color: #2a9d8f;
+      cursor: pointer;
     }
-    ul {
-      padding-left: 20px;
+    .success {
+      background: #dff0d8;
+      color: #3c763d;
+      padding: 10px;
+      margin-top: 1rem;
+      border-radius: 8px;
     }
-    li {
-      margin-bottom: 5px;
-      font-size: 0.95rem;
+    .entry-list {
+      margin-top: 2rem;
+    }
+    .entry {
+      background: #fff;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-left: 5px solid #2a9d8f;
+      border-radius: 6px;
     }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>QR Scanner</h1>
+  <h2>QR-Based Student Entry</h2>
 
-  <select id="camera-select"></select>
   <div id="reader"></div>
 
-  <div class="result">
-    <p>Scanned QR: <span id="qr-result">None</span></p>
-  </div>
+  <form id="entry-form">
+    <input type="text" id="qr-id" placeholder="Scanned QR ID" required readonly>
+    <input type="text" id="student-name" placeholder="Student Name" required>
+    <input type="number" id="age" placeholder="Age" min="1" required>
+    <select id="gender" required>
+      <option value="">Select Gender</option>
+      <option value="Male">Male</option>
+      <option value="Female">Female</option>
+    </select>
+    <button type="submit">Submit Entry</button>
+  </form>
 
-  <div class="history">
-    <h3>Scan History</h3>
-    <ul id="scan-history"></ul>
+  <div id="message" class="success" style="display:none;">Entry Saved!</div>
+
+  <div class="entry-list" id="entry-list">
+    <h3>Submitted Entries</h3>
   </div>
 </div>
 
 <script>
-  const resultContainer = document.getElementById('qr-result');
-  const historyList = document.getElementById('scan-history');
-  const cameraSelect = document.getElementById('camera-select');
+  const form = document.getElementById('entry-form');
+  const message = document.getElementById('message');
+  const entryList = document.getElementById('entry-list');
 
-  let html5QrCode;
-  let currentCameraId;
-
-  function addToHistory(data) {
-    const existing = JSON.parse(localStorage.getItem('qrHistory')) || [];
-    existing.push(data);
-    localStorage.setItem('qrHistory', JSON.stringify(existing));
-    renderHistory();
-  }
-
-  function renderHistory() {
-    const history = JSON.parse(localStorage.getItem('qrHistory')) || [];
-    historyList.innerHTML = '';
-    history.slice(-10).reverse().forEach((item, index) => {
-      const li = document.createElement('li');
-      li.textContent = `${item}`;
-      historyList.appendChild(li);
+  const renderEntries = () => {
+    const data = JSON.parse(localStorage.getItem('studentEntries')) || [];
+    entryList.innerHTML = "<h3>Submitted Entries</h3>";
+    data.reverse().forEach(entry => {
+      const div = document.createElement('div');
+      div.className = "entry";
+      div.innerHTML = `<strong>ID:</strong> ${entry.qr}<br>
+                       <strong>Name:</strong> ${entry.name}<br>
+                       <strong>Age:</strong> ${entry.age}<br>
+                       <strong>Gender:</strong> ${entry.gender}`;
+      entryList.appendChild(div);
     });
-  }
+  };
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const qr = document.getElementById('qr-id').value.trim();
+    const name = document.getElementById('student-name').value.trim();
+    const age = document.getElementById('age').value.trim();
+    const gender = document.getElementById('gender').value;
+
+    const newEntry = { qr, name, age, gender };
+    const entries = JSON.parse(localStorage.getItem('studentEntries')) || [];
+    entries.push(newEntry);
+    localStorage.setItem('studentEntries', JSON.stringify(entries));
+
+    message.style.display = 'block';
+    setTimeout(() => message.style.display = 'none', 2000);
+    form.reset();
+    renderEntries();
+  });
 
   function onScanSuccess(decodedText) {
-    resultContainer.textContent = decodedText;
-    addToHistory(decodedText);
-  }
-
-  function startScanner(cameraId) {
-    if (html5QrCode) {
-      html5QrCode.stop().then(() => {
-        html5QrCode.clear();
-        start(cameraId);
-      });
-    } else {
-      start(cameraId);
-    }
-  }
-
-  function start(cameraId) {
-    html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-      cameraId,
-      { fps: 10, qrbox: 250 },
-      onScanSuccess
-    );
+    document.getElementById('qr-id').value = decodedText;
   }
 
   Html5Qrcode.getCameras().then(cameras => {
     if (cameras.length) {
-      cameraSelect.innerHTML = '';
-      cameras.forEach(cam => {
-        const option = document.createElement('option');
-        option.value = cam.id;
-        option.text = cam.label || `Camera ${cameraSelect.length + 1}`;
-        cameraSelect.appendChild(option);
-      });
-
-      currentCameraId = cameras[0].id;
-      startScanner(currentCameraId);
-
-      cameraSelect.addEventListener('change', (e) => {
-        currentCameraId = e.target.value;
-        startScanner(currentCameraId);
-      });
-    } else {
-      alert("No cameras found");
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        cameras[0].id,
+        { fps: 10, qrbox: 250 },
+        onScanSuccess
+      );
     }
-  }).catch(err => console.error(err));
+  });
 
-  renderHistory(); // Load on start
+  renderEntries();
 </script>
 
 </body>
