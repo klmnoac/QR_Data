@@ -153,25 +153,41 @@
     });
   
     function confirmData() {
-      if (!scannedValues[steps[scanStep].key]) {
-        alert("Please scan the value before confirming.");
-        return;
-      }
-  
-      scanStep++;
-      if (scanStep < steps.length) {
-        popupTitle.textContent = steps[scanStep].title;
-        scannedDisplay.textContent = 'None';
-      } else {
-        html5QrCode.stop();
-        popup.style.display = 'none';
-  
-        const existing = JSON.parse(localStorage.getItem('studentEntries')) || [];
-        existing.push(scannedValues);
-        localStorage.setItem('studentEntries', JSON.stringify(existing));
-        renderEntries();
-      }
-    }
+  const key = steps[scanStep].key;
+  const value = scannedValues[key];
+
+  if (!value) {
+    alert("Please scan the value before confirming.");
+    return;
+  }
+
+  // Validate age
+  if (key === 'age' && !/^\d+$/.test(value)) {
+    alert("Age must be digits only.");
+    return;
+  }
+
+  // Validate gender
+  if (key === 'gender' && !/^(male|female)$/i.test(value.trim())) {
+    alert("Gender must be 'male' or 'female'.");
+    return;
+  }
+
+  scanStep++;
+  if (scanStep < steps.length) {
+    popupTitle.textContent = steps[scanStep].title;
+    scannedDisplay.textContent = 'None';
+  } else {
+    html5QrCode.stop();
+    popup.style.display = 'none';
+
+    const existing = JSON.parse(localStorage.getItem('studentEntries')) || [];
+    existing.push(scannedValues);
+    localStorage.setItem('studentEntries', JSON.stringify(existing));
+    renderEntries();
+  }
+}
+
   
     function renderEntries() {
       const entriesDiv = document.getElementById('entries');
