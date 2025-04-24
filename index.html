@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Code Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    #reader {
+      width: 300px;
+      margin: auto;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    #history {
+      margin-top: 30px;
+      text-align: left;
+      max-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>QR Code Scanner</h1>
+  <div id="reader"></div>
+
+  <div id="result">
+    <strong>Scanned QR:</strong> <span id="qr-result">None</span>
+  </div>
+
+  <div id="history">
+    <h3>Scan History:</h3>
+    <ul id="scan-history"></ul>
+  </div>
+
+  <script>
+    const resultContainer = document.getElementById('qr-result');
+    const historyList = document.getElementById('scan-history');
+
+    function addToHistory(data) {
+      const existing = JSON.parse(localStorage.getItem('qrHistory')) || [];
+      existing.push(data);
+      localStorage.setItem('qrHistory', JSON.stringify(existing));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const history = JSON.parse(localStorage.getItem('qrHistory')) || [];
+      historyList.innerHTML = '';
+      history.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.textContent = `${index + 1}: ${item}`;
+        historyList.appendChild(li);
+      });
+    }
+
+    function onScanSuccess(decodedText) {
+      resultContainer.textContent = decodedText;
+      addToHistory(decodedText);
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        html5QrCode.start(
+          cameras[0].id,
+          {
+            fps: 10,
+            qrbox: 250
+          },
+          onScanSuccess
+        );
+      }
+    });
+
+    renderHistory(); // Load scan history on page load
+  </script>
+
+</body>
+</html>
