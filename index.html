@@ -2,160 +2,193 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>QR Step Entry</title>
+  <title>QR Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f5f5f5;
       margin: 0;
-      padding: 20px;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f4f9;
+      color: #333;
+      padding: 1rem;
     }
-    button {
-      padding: 12px 20px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 8px;
-      background: #2a9d8f;
-      color: white;
-      cursor: pointer;
-    }
-    .popup {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
-    .popup-content {
-      background: white;
-      padding: 1.5rem;
-      border-radius: 12px;
+    .container {
       max-width: 400px;
-      width: 90%;
+      margin: auto;
+    }
+    h1 {
       text-align: center;
-      position: relative;
+      color: #444;
     }
     #reader {
       width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    select {
+      width: 100%;
+      padding: 10px;
       margin: 1rem 0;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
     }
-    h2 {
-      margin-bottom: 0.5rem;
-      color: #333;
-    }
-    .confirm {
-      background: #2196f3;
+    .result, .history {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
       margin-top: 1rem;
     }
-    .entry {
-      background: white;
-      padding: 10px;
-      margin-top: 10px;
-      border-left: 5px solid #2a9d8f;
-      border-radius: 6px;
+    .result span {
+      font-weight: bold;
+      color: #2a9d8f;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 5px;
+      font-size: 0.95rem;
     }
   </style>
 </head>
 <body>
 
-<button onclick="openPopup()">QR Entry</button>
+<div class="container">
+  <h1>QR Scanner</h1>
 
-<div id="entries"></div>
+  <select id="camera-select"></select>
+  <div id="reader"></div>
 
-<!-- Popup -->
-<div class="popup" id="popup">
-  <div class="popup-content">
-    <h2 id="popup-title">Scan Student Name</h2>
-    <div id="reader"></div>
-    <div><strong>Scanned:</strong> <span id="scanned-data">None</span></div>
-    <button class="confirm" onclick="confirmData()">Confirm</button>
+  <div class="result">
+    <p>Scanned QR: <span id="qr-result">None</span></p>
+  </div>
+
+  <div class="history">
+    <h3>Scan History</h3>
+    <ul id="scan-history"></ul>
   </div>
 </div>
 
 <script>
-  let scanStep = 0;
-  let scannedValues = {
-    name: '',
-    age: '',
-    gender: ''
-  };
-  let html5QrCode;
-
-  const popup = document.getElementById('popup');
-  const scannedDisplay = document.getElementById('scanned-data');
-  const popupTitle = document.getElementById('popup-title');
-
-  const steps = [
-    { key: 'name', title: 'Scan Student Name' },
-    { key: 'age', title: 'Scan Student Age' },
-    { key: 'gender', title: 'Scan Gender (Male/Female)' }
-  ];
-
-  function openPopup() {
-    popup.style.display = 'flex';
-    scanStep = 0;
-    scannedValues = { name: '', age: '', gender: '' };
-    scannedDisplay.textContent = 'None';
-    popupTitle.textContent = steps[scanStep].title;
-
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras.length) {
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start(
-          cameras[0].id,
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            scannedDisplay.textContent = decodedText;
-            scannedValues[steps[scanStep].key] = decodedText;
-          }
-        );
-      }
-    });
-  }
-
-  function confirmData() {
-    if (!scannedValues[steps[scanStep].key]) {
-      alert("Please scan the value before confirming.");
-      return;
-    }
-
-    scanStep++;
-    if (scanStep < steps.length) {
-      popupTitle.textContent = steps[scanStep].title;
+    let scanStep = 0;
+    let scannedValues = { name: '', age: '', gender: '' };
+    let html5QrCode;
+    let currentCameraId = null;
+  
+    const popup = document.getElementById('popup');
+    const scannedDisplay = document.getElementById('scanned-data');
+    const popupTitle = document.getElementById('popup-title');
+  
+    const steps = [
+      { key: 'name', title: 'Scan Student Name' },
+      { key: 'age', title: 'Scan Student Age' },
+      { key: 'gender', title: 'Scan Gender (Male/Female)' }
+    ];
+  
+    // Inject camera selector into popup
+    const cameraSelector = document.createElement('select');
+    cameraSelector.style.width = "100%";
+    cameraSelector.style.marginBottom = "10px";
+    cameraSelector.style.padding = "10px";
+    cameraSelector.style.borderRadius = "8px";
+    document.querySelector(".popup-content").insertBefore(cameraSelector, document.getElementById("reader"));
+  
+    function openPopup() {
+      popup.style.display = 'flex';
+      scanStep = 0;
+      scannedValues = { name: '', age: '', gender: '' };
       scannedDisplay.textContent = 'None';
-    } else {
-      // Save data
-      html5QrCode.stop();
-      popup.style.display = 'none';
-
-      const existing = JSON.parse(localStorage.getItem('studentEntries')) || [];
-      existing.push(scannedValues);
-      localStorage.setItem('studentEntries', JSON.stringify(existing));
-      renderEntries();
+      popupTitle.textContent = steps[scanStep].title;
+  
+      Html5Qrcode.getCameras().then(cameras => {
+        cameraSelector.innerHTML = '';
+        cameras.forEach(cam => {
+          const option = document.createElement('option');
+          option.value = cam.id;
+          option.text = cam.label || `Camera ${cameraSelector.length + 1}`;
+          cameraSelector.appendChild(option);
+        });
+  
+        // Auto-start with first camera
+        currentCameraId = cameras[0].id;
+        cameraSelector.value = currentCameraId;
+        startScanner(currentCameraId);
+      });
     }
-  }
-
-  function renderEntries() {
-    const entriesDiv = document.getElementById('entries');
-    const data = JSON.parse(localStorage.getItem('studentEntries')) || [];
-    entriesDiv.innerHTML = "<h3>Submitted Entries</h3>";
-    data.reverse().forEach(entry => {
-      const div = document.createElement('div');
-      div.className = 'entry';
-      div.innerHTML = `<strong>Name:</strong> ${entry.name}<br>
-                       <strong>Age:</strong> ${entry.age}<br>
-                       <strong>Gender:</strong> ${entry.gender}`;
-      entriesDiv.appendChild(div);
+  
+    function startScanner(cameraId) {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          runScanner(cameraId);
+        });
+      } else {
+        runScanner(cameraId);
+      }
+    }
+  
+    function runScanner(cameraId) {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        cameraId,
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          scannedDisplay.textContent = decodedText;
+          scannedValues[steps[scanStep].key] = decodedText;
+        }
+      );
+    }
+  
+    cameraSelector.addEventListener('change', (e) => {
+      currentCameraId = e.target.value;
+      startScanner(currentCameraId);
     });
-  }
-
-  renderEntries();
-</script>
+  
+    function confirmData() {
+      if (!scannedValues[steps[scanStep].key]) {
+        alert("Please scan the value before confirming.");
+        return;
+      }
+  
+      scanStep++;
+      if (scanStep < steps.length) {
+        popupTitle.textContent = steps[scanStep].title;
+        scannedDisplay.textContent = 'None';
+      } else {
+        html5QrCode.stop();
+        popup.style.display = 'none';
+  
+        const existing = JSON.parse(localStorage.getItem('studentEntries')) || [];
+        existing.push(scannedValues);
+        localStorage.setItem('studentEntries', JSON.stringify(existing));
+        renderEntries();
+      }
+    }
+  
+    function renderEntries() {
+      const entriesDiv = document.getElementById('entries');
+      const data = JSON.parse(localStorage.getItem('studentEntries')) || [];
+      entriesDiv.innerHTML = "<h3>Submitted Entries</h3>";
+      data.reverse().forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'entry';
+        div.innerHTML = `<strong>Name:</strong> ${entry.name}<br>
+                         <strong>Age:</strong> ${entry.age}<br>
+                         <strong>Gender:</strong> ${entry.gender}`;
+        entriesDiv.appendChild(div);
+      });
+    }
+  
+    renderEntries();
+  </script>
+  
 
 </body>
 </html>
