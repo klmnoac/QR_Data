@@ -2,176 +2,155 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Student QR Entry</title>
+  <title>QR Step Entry</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f1f5f9;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f5f5;
       margin: 0;
       padding: 20px;
-      color: #333;
-    }
-    .container {
-      max-width: 400px;
-      margin: auto;
-    }
-    h2 {
-      text-align: center;
-      color: #2a4365;
-    }
-    form {
-      background: white;
-      padding: 1rem;
-      border-radius: 12px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.08);
-    }
-    input, select, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 8px;
     }
     button {
+      padding: 12px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #2a9d8f;
+      color: white;
       cursor: pointer;
-      font-weight: bold;
+    }
+    .popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .popup-content {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      position: relative;
     }
     #reader {
       width: 100%;
+      margin: 1rem 0;
+    }
+    h2 {
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+    .confirm {
+      background: #2196f3;
       margin-top: 1rem;
-      display: none;
-    }
-    .buttons {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .buttons button {
-      flex: 1;
-    }
-    .entry-list {
-      margin-top: 2rem;
     }
     .entry {
-      background: #fff;
-      border-left: 5px solid #4299e1;
-      margin-bottom: 10px;
+      background: white;
       padding: 10px;
+      margin-top: 10px;
+      border-left: 5px solid #2a9d8f;
       border-radius: 6px;
-    }
-    .success {
-      background: #d1fae5;
-      color: #065f46;
-      padding: 10px;
-      margin-top: 1rem;
-      border-radius: 8px;
-      text-align: center;
     }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h2>Student Data Entry</h2>
+<button onclick="openPopup()">QR Entry</button>
 
-  <form id="entry-form">
-    <input type="text" id="qr-id" placeholder="QR ID (Scan or Type)" required>
-    <input type="text" id="student-name" placeholder="Student Name" required>
-    <input type="number" id="age" placeholder="Age" min="1" required>
-    <select id="gender" required>
-      <option value="">Select Gender</option>
-      <option>Male</option>
-      <option>Female</option>
-    </select>
+<div id="entries"></div>
 
-    <div class="buttons">
-      <button type="button" onclick="startScan()">Scan QR</button>
-      <button type="submit">Submit</button>
-      <button type="button" onclick="resetForm()">Reset</button>
-    </div>
-  </form>
-
-  <div id="reader"></div>
-  <div id="message" class="success" style="display:none;">Entry Saved!</div>
-
-  <div class="entry-list" id="entry-list">
-    <h3>Saved Entries</h3>
+<!-- Popup -->
+<div class="popup" id="popup">
+  <div class="popup-content">
+    <h2 id="popup-title">Scan Student Name</h2>
+    <div id="reader"></div>
+    <div><strong>Scanned:</strong> <span id="scanned-data">None</span></div>
+    <button class="confirm" onclick="confirmData()">Confirm</button>
   </div>
 </div>
 
 <script>
-  const form = document.getElementById('entry-form');
-  const message = document.getElementById('message');
-  const entryList = document.getElementById('entry-list');
-  const reader = document.getElementById('reader');
-
+  let scanStep = 0;
+  let scannedValues = {
+    name: '',
+    age: '',
+    gender: ''
+  };
   let html5QrCode;
 
-  function showMessage() {
-    message.style.display = 'block';
-    setTimeout(() => message.style.display = 'none', 2000);
-  }
+  const popup = document.getElementById('popup');
+  const scannedDisplay = document.getElementById('scanned-data');
+  const popupTitle = document.getElementById('popup-title');
 
-  function renderEntries() {
-    const entries = JSON.parse(localStorage.getItem('studentEntries')) || [];
-    entryList.innerHTML = "<h3>Saved Entries</h3>";
-    entries.reverse().forEach(entry => {
-      const div = document.createElement('div');
-      div.className = "entry";
-      div.innerHTML = `<strong>ID:</strong> ${entry.qr}<br>
-                       <strong>Name:</strong> ${entry.name}<br>
-                       <strong>Age:</strong> ${entry.age}<br>
-                       <strong>Gender:</strong> ${entry.gender}`;
-      entryList.appendChild(div);
-    });
-  }
+  const steps = [
+    { key: 'name', title: 'Scan Student Name' },
+    { key: 'age', title: 'Scan Student Age' },
+    { key: 'gender', title: 'Scan Gender (Male/Female)' }
+  ];
 
-  function resetForm() {
-    form.reset();
-    document.getElementById('qr-id').focus();
-  }
+  function openPopup() {
+    popup.style.display = 'flex';
+    scanStep = 0;
+    scannedValues = { name: '', age: '', gender: '' };
+    scannedDisplay.textContent = 'None';
+    popupTitle.textContent = steps[scanStep].title;
 
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    const qr = document.getElementById('qr-id').value.trim();
-    const name = document.getElementById('student-name').value.trim();
-    const age = document.getElementById('age').value.trim();
-    const gender = document.getElementById('gender').value;
-
-    const newEntry = { qr, name, age, gender };
-    const entries = JSON.parse(localStorage.getItem('studentEntries')) || [];
-    entries.push(newEntry);
-    localStorage.setItem('studentEntries', JSON.stringify(entries));
-
-    showMessage();
-    resetForm();
-    renderEntries();
-  });
-
-  function startScan() {
-    reader.style.display = 'block';
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
-    }
     Html5Qrcode.getCameras().then(cameras => {
       if (cameras.length) {
+        html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start(
           cameras[0].id,
           { fps: 10, qrbox: 250 },
           (decodedText) => {
-            document.getElementById('qr-id').value = decodedText;
-            html5QrCode.stop().then(() => {
-              reader.style.display = 'none';
-            });
+            scannedDisplay.textContent = decodedText;
+            scannedValues[steps[scanStep].key] = decodedText;
           }
         );
       }
-    }).catch(err => {
-      alert("Camera access failed: " + err);
+    });
+  }
+
+  function confirmData() {
+    if (!scannedValues[steps[scanStep].key]) {
+      alert("Please scan the value before confirming.");
+      return;
+    }
+
+    scanStep++;
+    if (scanStep < steps.length) {
+      popupTitle.textContent = steps[scanStep].title;
+      scannedDisplay.textContent = 'None';
+    } else {
+      // Save data
+      html5QrCode.stop();
+      popup.style.display = 'none';
+
+      const existing = JSON.parse(localStorage.getItem('studentEntries')) || [];
+      existing.push(scannedValues);
+      localStorage.setItem('studentEntries', JSON.stringify(existing));
+      renderEntries();
+    }
+  }
+
+  function renderEntries() {
+    const entriesDiv = document.getElementById('entries');
+    const data = JSON.parse(localStorage.getItem('studentEntries')) || [];
+    entriesDiv.innerHTML = "<h3>Submitted Entries</h3>";
+    data.reverse().forEach(entry => {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.innerHTML = `<strong>Name:</strong> ${entry.name}<br>
+                       <strong>Age:</strong> ${entry.age}<br>
+                       <strong>Gender:</strong> ${entry.gender}`;
+      entriesDiv.appendChild(div);
     });
   }
 
