@@ -2,87 +2,154 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>QR Code Scanner</title>
+  <title>QR Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      text-align: center;
+    * {
+      box-sizing: border-box;
     }
-    #reader {
-      width: 300px;
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f4f9;
+      color: #333;
+      padding: 1rem;
+    }
+    .container {
+      max-width: 400px;
       margin: auto;
     }
-    #result {
-      margin-top: 20px;
-      font-size: 18px;
+    h1 {
+      text-align: center;
+      color: #444;
     }
-    #history {
-      margin-top: 30px;
-      text-align: left;
-      max-width: 300px;
-      margin-left: auto;
-      margin-right: auto;
+    #reader {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    select {
+      width: 100%;
+      padding: 10px;
+      margin: 1rem 0;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .result, .history {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      margin-top: 1rem;
+    }
+    .result span {
+      font-weight: bold;
+      color: #2a9d8f;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 5px;
+      font-size: 0.95rem;
     }
   </style>
 </head>
 <body>
 
-  <h1>QR Code Scanner</h1>
+<div class="container">
+  <h1>QR Scanner</h1>
+
+  <select id="camera-select"></select>
   <div id="reader"></div>
 
-  <div id="result">
-    <strong>Scanned QR:</strong> <span id="qr-result">None</span>
+  <div class="result">
+    <p>Scanned QR: <span id="qr-result">None</span></p>
   </div>
 
-  <div id="history">
-    <h3>Scan History:</h3>
+  <div class="history">
+    <h3>Scan History</h3>
     <ul id="scan-history"></ul>
   </div>
+</div>
 
-  <script>
-    const resultContainer = document.getElementById('qr-result');
-    const historyList = document.getElementById('scan-history');
+<script>
+  const resultContainer = document.getElementById('qr-result');
+  const historyList = document.getElementById('scan-history');
+  const cameraSelect = document.getElementById('camera-select');
 
-    function addToHistory(data) {
-      const existing = JSON.parse(localStorage.getItem('qrHistory')) || [];
-      existing.push(data);
-      localStorage.setItem('qrHistory', JSON.stringify(existing));
-      renderHistory();
-    }
+  let html5QrCode;
+  let currentCameraId;
 
-    function renderHistory() {
-      const history = JSON.parse(localStorage.getItem('qrHistory')) || [];
-      historyList.innerHTML = '';
-      history.forEach((item, index) => {
-        const li = document.createElement('li');
-        li.textContent = `${index + 1}: ${item}`;
-        historyList.appendChild(li);
-      });
-    }
+  function addToHistory(data) {
+    const existing = JSON.parse(localStorage.getItem('qrHistory')) || [];
+    existing.push(data);
+    localStorage.setItem('qrHistory', JSON.stringify(existing));
+    renderHistory();
+  }
 
-    function onScanSuccess(decodedText) {
-      resultContainer.textContent = decodedText;
-      addToHistory(decodedText);
-    }
-
-    const html5QrCode = new Html5Qrcode("reader");
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        html5QrCode.start(
-          cameras[0].id,
-          {
-            fps: 10,
-            qrbox: 250
-          },
-          onScanSuccess
-        );
-      }
+  function renderHistory() {
+    const history = JSON.parse(localStorage.getItem('qrHistory')) || [];
+    historyList.innerHTML = '';
+    history.slice(-10).reverse().forEach((item, index) => {
+      const li = document.createElement('li');
+      li.textContent = `${item}`;
+      historyList.appendChild(li);
     });
+  }
 
-    renderHistory(); // Load scan history on page load
-  </script>
+  function onScanSuccess(decodedText) {
+    resultContainer.textContent = decodedText;
+    addToHistory(decodedText);
+  }
+
+  function startScanner(cameraId) {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        html5QrCode.clear();
+        start(cameraId);
+      });
+    } else {
+      start(cameraId);
+    }
+  }
+
+  function start(cameraId) {
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      cameraId,
+      { fps: 10, qrbox: 250 },
+      onScanSuccess
+    );
+  }
+
+  Html5Qrcode.getCameras().then(cameras => {
+    if (cameras.length) {
+      cameraSelect.innerHTML = '';
+      cameras.forEach(cam => {
+        const option = document.createElement('option');
+        option.value = cam.id;
+        option.text = cam.label || `Camera ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(option);
+      });
+
+      currentCameraId = cameras[0].id;
+      startScanner(currentCameraId);
+
+      cameraSelect.addEventListener('change', (e) => {
+        currentCameraId = e.target.value;
+        startScanner(currentCameraId);
+      });
+    } else {
+      alert("No cameras found");
+    }
+  }).catch(err => console.error(err));
+
+  renderHistory(); // Load on start
+</script>
 
 </body>
 </html>
